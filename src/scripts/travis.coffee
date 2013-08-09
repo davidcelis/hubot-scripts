@@ -6,7 +6,7 @@
 #   "gitio": "1.0.1"
 #
 # Configuration:
-#   None
+#   HUBOT_TRAVIS_TOKEN
 #
 # Commands:
 #   hubot travis me <user>/<repo> - Returns the build status of https://github.com/<user>/<repo>
@@ -22,9 +22,11 @@
 url = require('url')
 querystring = require('querystring')
 gitio = require('gitio')
+crypto = require('crypto');
+key = process.env.HUBOT_TRAVIS_TOKEN
 
 module.exports = (robot) ->
-  
+
   robot.respond /travis me (.*)/i, (msg) ->
     project = escape(msg.match[1])
     msg.http("https://api.travis-ci.org/repos/#{project}")
@@ -38,6 +40,13 @@ module.exports = (robot) ->
           msg.send "Build status for #{project}: Unknown"
 
   robot.router.post "/hubot/travis", (req, res) ->
+    sha256 = crypto.createHash('sha256').update(project + key).digest("hex")
+    auth_header = req.headers['Authorization']
+
+    if key && sha256 != auth_header
+      console.log '"Travis" hook received from unknown origin. Or your Token is incorrect.'
+      return
+
     query = querystring.parse url.parse(req.url).query
     res.end JSON.stringify {
        received: true #some client have problems with and empty response
